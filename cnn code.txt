@@ -1,0 +1,344 @@
+import os
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.nn.functional as F
+from tqdm import tqdm
+from src.dataloader import get_dataloaders
+from src.model import ResNet18_UNet
+
+# -------------------
+# Config
+# -------------------
+DATA_ROOT = "dataset"
+EPOCHS = 20
+BATCH_SIZE = 4
+LR = 1e-4
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+CHECKPOINT_PATH = "outputs/checkpoints/best_model.pth"
+os.makedirs(os.path.dirname(CHECKPOINT_PATH), exist_ok=True)  # auto create folder
+
+# -------------------
+# Training Function
+# -------------------
+def train():
+    # Load data
+    train_loader, val_loader, _ = get_dataloaders(DATA_ROOT, batch_size=BATCH_SIZE)
+
+    # Model
+    model = ResNet18_UNet().to(DEVICE)
+
+    # Loss & Optimizer
+    criterion = nn.L1Loss()  # pixel-wise difference
+    optimizer = optim.Adam(model.parameters(), lr=LR)
+
+    best_val_loss = float("inf")
+
+    for epoch in range(EPOCHS):
+        # ---- Training ----
+        model.train()
+        train_loss = 0
+        for low, high in tqdm(train_loader, desc=f"Epoch {epoch+1}/{EPOCHS} [Train]"):
+            low, high = low.to(DEVICE), high.to(DEVICE)
+
+            optimizer.zero_grad()
+            outputs = model(low)
+            
+            # Resize outputs to match high-dose image size
+            outputs = F.interpolate(outputs, size=high.shape[2:], mode='bilinear', align_corners=False)
+
+            loss = criterion(outputs, high)
+            loss.backward()
+            optimizer.step()
+
+            train_loss += loss.item()
+
+        avg_train_loss = train_loss / len(train_loader)
+
+        # ---- Validation ----
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for low, high in tqdm(val_loader, desc=f"Epoch {epoch+1}/{EPOCHS} [Val]"):
+                low, high = low.to(DEVICE), high.to(DEVICE)
+                outputs = model(low)
+                
+                # Resize outputs to match high-dose image size
+                outputs = F.interpolate(outputs, size=high.shape[2:], mode='bilinear', align_corners=False)
+
+                loss = criterion(outputs, high)
+                val_loss += loss.item()
+
+        avg_val_loss = val_loss / len(val_loader)
+
+        print(f"Epoch [{epoch+1}/{EPOCHS}] Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}")
+
+        # Save best model
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            torch.save(model.state_dict(), CHECKPOINT_PATH)
+            print(f"✅ Best model saved at {CHECKPOINT_PATH}")
+
+
+if __name__ == "__main__":
+    train()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import os
+import sys
+import torch
+from PIL import Image
+import torchvision.transforms as transforms
+
+# ✅ Add parent folder to sys.path so that "src" is recognized
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from src.model import ResNet18_UNet
+
+# -------------------
+# Config
+# -------------------
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+MODEL_PATH = "outputs/checkpoints/best_model.pth"
+TEST_DIR = "dataset/test/low"
+RESULTS_DIR = "outputs/results"
+
+os.makedirs(RESULTS_DIR, exist_ok=True)
+
+# -------------------
+# Load Model
+# -------------------
+model = ResNet18_UNet().to(DEVICE)
+model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+model.eval()
+
+# -------------------
+# Transform (for model input only)
+# -------------------
+transform = transforms.Compose([
+    transforms.Resize((256, 256)),
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))
+])
+
+to_pil = transforms.ToPILImage()
+
+
+# -------------------
+# Inference
+# -------------------
+def enhance_image(image_path, save_path):
+    try:
+        # Open original image
+        img = Image.open(image_path).convert("L")
+        orig_size = img.size  # (width, height)
+
+        # Transform for model input (resize -> tensor -> normalize)
+        inp = transform(img).unsqueeze(0).to(DEVICE)  # [1,1,256,256]
+
+        with torch.no_grad():
+            out = model(inp)
+
+        # Denormalize back to [0,1]
+        out = out.squeeze(0).cpu()  # [1,256,256]
+        out = (out * 0.5 + 0.5).clamp(0, 1)
+
+        # Convert to PIL
+        out_img = to_pil(out)
+
+        # ✅ Resize back to original size
+        out_img = out_img.resize(orig_size, Image.BICUBIC)
+
+        # Save
+        out_img.save(save_path)
+        print(f"✅ Saved: {save_path} | Size: {orig_size}")
+
+    except Exception as e:
+        print(f"❌ Skipping {image_path}: {e}")
+
+
+def run_inference():
+    for filename in os.listdir(TEST_DIR):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
+            in_path = os.path.join(TEST_DIR, filename)
+            out_path = os.path.join(
+                RESULTS_DIR,
+                filename.rsplit('.', 1)[0] + "_enhanced.png"
+            )
+            enhance_image(in_path, out_path)
+
+
+if __name__ == "__main__":
+    run_inference()
+
+
+
+
+
+
+
+
+
+
+
+
+
+import torch
+import torch.nn as nn
+import torchvision.models as models
+
+class EncoderResNet18(nn.Module):
+    def __init__(self):
+        super().__init__()
+        resnet = models.resnet18(pretrained=True)
+
+        # Change first conv layer to accept 1 channel (grayscale)
+        self.enc1 = nn.Sequential(
+            nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            resnet.bn1,
+            resnet.relu
+        )
+        self.enc2 = nn.Sequential(resnet.maxpool, resnet.layer1)  # 64
+        self.enc3 = resnet.layer2                                   # 128
+        self.enc4 = resnet.layer3                                   # 256
+        self.enc5 = resnet.layer4                                   # 512
+
+    def forward(self, x):
+        x1 = self.enc1(x)  # [B,64,H/2,W/2]
+        x2 = self.enc2(x1) # [B,64,H/4,W/4]
+        x3 = self.enc3(x2) # [B,128,H/8,W/8]
+        x4 = self.enc4(x3) # [B,256,H/16,W/16]
+        x5 = self.enc5(x4) # [B,512,H/32,W/32]
+        return x1, x2, x3, x4, x5
+
+
+class DecoderBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
+
+class ResNet18_UNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = EncoderResNet18()
+
+        self.dec5 = DecoderBlock(512, 256)
+        self.dec4 = DecoderBlock(512, 128)  # skip connection
+        self.dec3 = DecoderBlock(256, 64)
+        self.dec2 = DecoderBlock(128, 64)
+        self.dec1 = nn.Conv2d(128, 1, kernel_size=1)  # grayscale output
+
+    def forward(self, x):
+        x1, x2, x3, x4, x5 = self.encoder(x)
+
+        d5 = self.dec5(x5)
+        d4 = self.dec4(torch.cat([d5, x4], dim=1))
+        d3 = self.dec3(torch.cat([d4, x3], dim=1))
+        d2 = self.dec2(torch.cat([d3, x2], dim=1))
+        d1 = self.dec1(torch.cat([d2, x1], dim=1))
+
+        return torch.tanh(d1)  # output [-1,1] matching normalized grayscale
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import os
+from torch.utils.data import Dataset, DataLoader
+from PIL import Image
+import torchvision.transforms as transforms
+
+class XrayDataset(Dataset):
+    def __init__(self, low_dir, high_dir, transform=None):
+        self.low_dir = low_dir
+        self.high_dir = high_dir
+        self.low_images = sorted(os.listdir(low_dir))
+        self.high_images = sorted(os.listdir(high_dir))
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.low_images)
+
+    def __getitem__(self, idx):
+        low_path = os.path.join(self.low_dir, self.low_images[idx])
+        high_path = os.path.join(self.high_dir, self.high_images[idx])
+
+        low_img = Image.open(low_path).convert("L")   # Grayscale
+        high_img = Image.open(high_path).convert("L")
+
+        if self.transform:
+            low_img = self.transform(low_img)
+            high_img = self.transform(high_img)
+
+        return low_img, high_img
+
+
+def get_dataloaders(data_root, batch_size=4):
+    transform = transforms.Compose([
+        transforms.Resize((256, 256)),
+        transforms.ToTensor(),  
+        transforms.Normalize((0.5,), (0.5,))  # Normalize grayscale
+    ])
+
+    train_dataset = XrayDataset(
+        os.path.join(data_root, "train/low"),
+        os.path.join(data_root, "train/high"),
+        transform=transform
+    )
+
+    val_dataset = XrayDataset(
+        os.path.join(data_root, "val/low"),
+        os.path.join(data_root, "val/high"),
+        transform=transform
+    )
+
+    test_dataset = XrayDataset(
+        os.path.join(data_root, "test/low"),
+        os.path.join(data_root, "test/high"),
+        transform=transform
+    )
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=1, shuffle=False)
+
+    return train_loader, val_loader, test_loader
