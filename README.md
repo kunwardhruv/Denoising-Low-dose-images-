@@ -15,6 +15,7 @@ To denoise and enhance low-dose X-ray images using CNN architecture, improving i
 
 📁 Folder Structure
 
+```
 PRE-TRAINED CNN/
 │
 ├── dataset/
@@ -42,6 +43,7 @@ PRE-TRAINED CNN/
 │
 ├── cnn_code.md / txt
 └── README.md
+```
 
 
 🧩 Model Architecture
@@ -104,7 +106,7 @@ Higher PSNR and SSIM values indicate better denoising performance.
 
 ▶️ How to Run
 
-1.) Clone the repository
+``` 1.) Clone the repository
 
 git clone https://github.com/<your-username>/pre-trained-cnn.git
 cd pre-trained-cnn
@@ -129,6 +131,8 @@ python src/inference.py
 The trained model generates denoised X-rays and saves them in:
 
 outputs/results/
+
+```
 
 🧑‍⚕️ Impact
 
