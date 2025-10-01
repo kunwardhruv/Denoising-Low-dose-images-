@@ -9,11 +9,13 @@ In medical imaging, radiation exposure is harmful to the human body.
 So, instead of capturing high-dose (clear) X-rays, we capture low-dose (safer but noisy) X-rays and then enhance them using our trained CNN model.
 
 Our model restores the low-dose X-rays to near high-dose quality — making them clear, detailed, and diagnostically useful for doctors while reducing radiation risk to patients.
+
 ---
 
 # 🧠 Objective
 
 To denoise and enhance low-dose X-ray images using CNN architecture, improving image clarity while minimizing radiation exposure to patients.
+
 ---
 
 # 📁 Folder Structure
@@ -68,20 +70,21 @@ The CNN (ResNet18 + UNet) model processes this noisy image.
 
 The output is a clean, enhanced X-ray image with high clarity.
 
-```
 
 # 🖼️ Results
+
+
 🔹 Before Enhancement (Low-Dose Input)
 
 <img width="275" height="277" alt="Screenshot (236)" src="https://github.com/user-attachments/assets/ab3179ec-e622-4099-800f-e2aa5b1d76ee" />
 
-
+---
 
 🔹 After Enhancement (Model Output)
 
 <img width="449" height="509" alt="Screenshot (235)" src="https://github.com/user-attachments/assets/3c81d8a0-ad36-473f-85ec-7a098196a064" />
 
-```
+
 
 The enhanced X-ray clearly shows anatomical structures with reduced noise, allowing doctors to detect diseases effectively without high radiation exposure.
 ---
@@ -115,7 +118,8 @@ Higher PSNR and SSIM values indicate better denoising performance.
 
 # ▶️ How to Run
 
-``` 1.) Clone the repository
+```
+1.) Clone the repository
 
 git clone https://github.com/<your-username>/pre-trained-cnn.git
 cd pre-trained-cnn
@@ -144,7 +148,7 @@ outputs/results/
 ```
 ---
 
-#🧑‍⚕️ Impact
+# 🧑‍⚕️ Impact
 
 This model contributes to safer radiology practices by:
 
