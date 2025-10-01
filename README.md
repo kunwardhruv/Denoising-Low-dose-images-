@@ -14,6 +14,8 @@ Our model restores the low-dose X-rays to near high-dose quality — making them
 To denoise and enhance low-dose X-ray images using CNN architecture, improving image clarity while minimizing radiation exposure to patients.
 
 📁 Folder Structure
+
+
 PRE-TRAINED CNN/
 │
 ├── dataset/
@@ -102,23 +104,23 @@ Higher PSNR and SSIM values indicate better denoising performance.
 
 ▶️ How to Run
 
-Clone the repository
+1.) Clone the repository
 
 git clone https://github.com/<your-username>/pre-trained-cnn.git
 cd pre-trained-cnn
 
 
-Install dependencies
+2.) Install dependencies
 
 pip install -r requirements.txt
 
 
-Train the model
+3.) Train the model
 
 python src/train.py
 
 
-Run inference
+4.) Run inference
 
 python src/inference.py
 
