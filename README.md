@@ -15,34 +15,22 @@ To denoise and enhance low-dose X-ray images using CNN architecture, improving i
 
 📁 Folder Structure
 
-
-PRE-TRAINED CNN/
-│
-├── dataset/
-│   ├── train/
-│   │   ├── high/
-│   │   └── low/
-│   ├── val/
-│   │   ├── high/
-│   │   └── low/
-│   └── test/
-│       ├── high/
-│       └── low/
-│
-├── outputs/
-│   ├── checkpoints/
-│   │   └── best_model.pth
-│   └── results/
-│
-├── src/
-│   ├── dataloader.py
-│   ├── model.py
-│   ├── train.py
-│   ├── inference.py
-│   └── metrics.py
-│
-├── cnn_code.md / txt
-└── README.md
+Driver-Drowsiness-Detection-System/
+├── Annotation/                     # Contains annotation files for the dataset
+├── MRL Eye Dataset/                # Directory for the MRL Eye Dataset
+│   └── mrlEyes_2018_01/            # Subdirectory with eye images
+├── models/                         # Directory to save trained models
+├── prepared data/                  # Processed data ready for training
+├── Data Preparation.ipynb          # Notebook for data preprocessing
+├── Model Training.ipynb            # Notebook for model training
+├── main.ipynb                      # Main application notebook
+├── alarm.wav                       # Audio file for alarm
+├── best_model.h5                   # Best trained model file
+├── haarcascade_frontalface_alt.xml # Haar Cascade for frontal face detection
+├── haarcascade_lefteye_2splits.xml # Haar Cascade for left eye detection
+├── haarcascade_righteye_2splits.xml# Haar Cascade for right eye detection
+├── README.md                       # Project documentation
+└── requirements.txt                # List of required Python packages
 
 🧩 Model Architecture
 
